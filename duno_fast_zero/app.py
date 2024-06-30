@@ -1,7 +1,7 @@
+from http import HTTPStatus
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from duno_fast_zero.schemas import Message
-from http import HTTPStatus
 
 app = FastAPI()
 
