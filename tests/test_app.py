@@ -83,14 +83,15 @@ def test_read_single_user(client, user):
     assert response.json() == user_schema
 
 
-def test_update_user(client, user):
+def test_update_user(client, user, token):
     response = client.put(
-        '/users/1',
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
         json={
             'password': 'password',
             'username': 'fulano de tal',
             'email': 'test@test.com',
-            'id': 1,
+            'id': 999,
         },
     )
     assert response.status_code == HTTPStatus.OK
@@ -101,30 +102,54 @@ def test_update_user(client, user):
     }
 
 
-def test_update_user_not_found(client, user):
-    response = client.put(
-        '/users/999',
-        json={
-            'password': 'password',
-            'username': 'fulano de tal',
-            'email': 'email@email.com',
-            'id': 999,
-        },
-    )
-
-    assert response.status_code == HTTPStatus.NOT_FOUND
-
-
-def test_delete_user(client, user):
+def test_delete_user(client, user, token):
     response = client.delete(
-        '/users/1',
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
     )
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'message': 'User deleted'}
 
 
-def test_delete_user_not_found(client, user):
-    response = client.delete(
-        '/users/999',
+def test_get_token(client, user):
+    response = client.post(
+        '/token',
+        data={
+            'username': user.username,
+            'password': user.clean_password,
+        },
     )
-    assert response.status_code == HTTPStatus.NOT_FOUND
+
+    token = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert 'access_token' in token
+    assert token['token_type'] == 'Bearer'
+
+
+def test_create_user_email_already_exists(client, user):
+    response = client.post(
+        '/users/',
+        json={
+            'username': 'new_user_name',
+            'password': 'password',
+            'email': user.email,
+        },
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Email already exists'}
+
+
+def test_create_user_username_already_exists(client, user):
+    response = client.post(
+        '/users/',
+        json={
+            'username': user.username,
+            'password': 'password',
+            'email': 'new_email@email.com',
+        },
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+    assert response.json() == {'detail': 'Username already exists'}

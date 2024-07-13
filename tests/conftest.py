@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from duno_fast_zero.app import app
 from duno_fast_zero.database import get_session
 from duno_fast_zero.models import User, table_registry
+from duno_fast_zero.security import get_password_hash
 
 
 @pytest.fixture()
@@ -48,10 +49,27 @@ def session():
 
 @pytest.fixture()
 def user(session):
-    user = User(username='test', email='test@test.com', password='testest')
+    pwd = 'testtest'
+    user = User(
+        username='test',
+        email='test@test.com',
+        password=get_password_hash(pwd),
+    )
 
     session.add(user)
     session.commit()
     session.refresh(user)
 
+    # Monkey patch: alterando atributo em tempo de execução
+    user.clean_password = pwd
+
     return user
+
+
+@pytest.fixture()
+def token(client, user):
+    response = client.post(
+        '/token',
+        data={'username': user.username, 'password': user.clean_password},
+    )
+    return response.json()['access_token']
