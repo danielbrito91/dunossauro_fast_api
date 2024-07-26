@@ -1,13 +1,14 @@
 import factory
+import factory.fuzzy
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
+from testcontainers.postgres import PostgresContainer
 
 from duno_fast_zero.app import app
 from duno_fast_zero.database import get_session
-from duno_fast_zero.models import User, table_registry
+from duno_fast_zero.models import Todo, TodoState, User, table_registry
 from duno_fast_zero.security import get_password_hash
 
 
@@ -34,20 +35,19 @@ def client(session):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
-def session():
-    # Cria um banco de dados em memória
-    engine = create_engine(
-        'sqlite:///:memory:',
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool,
-    )
+@pytest.fixture(scope='session')
+def engine():
+    with PostgresContainer('postgres:16', driver='psycopg') as postgres:
+        _engine = create_engine(postgres.get_connection_url())
 
+        with _engine.begin():
+            yield _engine
+
+
+@pytest.fixture()
+def session(engine):
     # Cria toda a estrutura do banco
     # a partir desses metadados usando a engine, plz
-    # Singleton -> cria todas as tabelas com apenas uma chamada
-
-    # Setup
     table_registry.metadata.create_all(engine)
 
     with Session(engine) as session:
@@ -94,3 +94,13 @@ def token(client, user):
         data={'username': user.username, 'password': user.clean_password},
     )
     return response.json()['access_token']
+
+
+class TodoFactory(factory.Factory):
+    class Meta:
+        model = Todo
+
+    title = factory.Faker('text')
+    description = factory.Faker('text')
+    state = factory.fuzzy.FuzzyChoice(TodoState)
+    user_id = 1
